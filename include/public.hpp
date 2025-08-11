@@ -1,0 +1,51 @@
+#ifndef _PUBLIC_
+#define _PUBLIC_
+
+#include <type_traits>
+#include <memory>
+#include <mutex>
+
+enum class EnMsgType{
+    MSG_REG,
+    MSG_LOGIN,
+};
+
+using MsgUnderType = std::underlying_type_t<EnMsgType>;
+
+inline MsgUnderType getEnumValue(EnMsgType e){
+    return static_cast<MsgUnderType>(e);
+}
+
+#define GetEnumString(x) #x
+
+template<typename T>
+class Singleton{
+public:
+    template<typename ...Args>
+    static std::shared_ptr<T> instance(Args&&... args){
+        std::call_once(m_onceflag, [...args = std::forward<Args>(args)]{
+            m_ptr.reset(new T(std::forward<Args>(args)...));
+        });
+        return m_ptr;
+    }
+
+    Singleton(const Singleton&) = delete;
+    Singleton& operator=(const Singleton&) = delete;
+
+protected:
+    Singleton() = default;
+    virtual ~Singleton() = default;
+
+private:
+    static std::shared_ptr<T> m_ptr;
+    static std::once_flag m_onceflag;
+};
+
+template<typename T>
+std::once_flag Singleton<T>::m_onceflag;
+
+template<typename T>
+std::shared_ptr<T> Singleton<T>::m_ptr = nullptr;
+
+
+#endif
