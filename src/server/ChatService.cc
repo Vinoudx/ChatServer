@@ -46,8 +46,36 @@ CbType ChatService::getHandler(EnMsgType msgtype){
 
 
 void ChatService::login(const muduo::net::TcpConnectionPtr& conn, json& js, muduo::Timestamp tsp){
-    LOG_INFO << "someone login !";
+    int id = js["id"];
+    std::string password = js["pwd"];
+    User user = m_usermodel.query(id);
+
+    json response;
+    if(user.getId() == id && user.getPwd() == password){
+
+        if(user.getState() == "online"){
+            response["msgid"] = getEnumValue(EnMsgType::MSG_LOGIN_ACK);
+            response["errno"] = 1;
+            response["errinfo"] = "already online";
+        }else{
+            user.setState("online");
+            m_usermodel.updateState(user);
+            response["msgid"] = getEnumValue(EnMsgType::MSG_LOGIN_ACK);
+            response["errno"] = 0;
+            response["id"] = user.getId();
+            response["name"] = user.getName();
+        }
+
+    }else{
+        response["msgid"] = getEnumValue(EnMsgType::MSG_LOGIN_ACK);
+        response["errno"] = 1;
+        response["errinfo"] = "invalid account or password";
+    }
+
+    conn->send(response.dump());
 }
+
+
 void ChatService::reg(const muduo::net::TcpConnectionPtr& conn, json& js, muduo::Timestamp tsp){
     User user;
     user.setName(js["name"]);
@@ -58,7 +86,7 @@ void ChatService::reg(const muduo::net::TcpConnectionPtr& conn, json& js, muduo:
     if (res){
         response["msgid"] = getEnumValue(EnMsgType::MSG_REG_ACK);
         response["errno"] = 0;
-        response["userid"] = user.getId();
+        response["id"] = user.getId();
     }else{
         response["msgid"] = getEnumValue(EnMsgType::MSG_REG_ACK);
         response["errno"] = 1;

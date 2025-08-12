@@ -21,6 +21,10 @@ public:
     void setPwd(const std::string& pwd){m_password = pwd;}
     void setState(const std::string& state){m_state = state;}
 
+    User(const User&) = default;
+    User& operator=(const User&) = default;
+    User(User&&) noexcept = default;
+
 private:
     int m_id;
     std::string m_name;
