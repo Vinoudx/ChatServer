@@ -60,6 +60,13 @@ void ChatService::login(const muduo::net::TcpConnectionPtr& conn, json& js, mudu
         }else{
             user.setState("online");
             m_usermodel.updateState(user);
+            
+
+            {
+                std::lock_guard<std::mutex> l(m_conMutex);
+                m_userConMap.insert_or_assign(user.getId(), conn);
+            }
+
             response["msgid"] = getEnumValue(EnMsgType::MSG_LOGIN_ACK);
             response["errno"] = 0;
             response["id"] = user.getId();

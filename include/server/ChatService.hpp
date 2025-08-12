@@ -3,6 +3,7 @@
 
 #include <unordered_map>
 #include <functional>
+#include <mutex>
 
 #include <muduo/net/TcpServer.h>
 #include "json.hpp"
@@ -34,6 +35,9 @@ private:
     ChatService();
     
     std::unordered_map<MsgUnderType, CbType> m_cbFuncMap;
+
+    std::mutex m_conMutex; // 给下面的映射关系加锁
+    std::unordered_map<int, muduo::net::TcpConnectionPtr> m_userConMap;
 
     UserModel m_usermodel;
 };
