@@ -26,6 +26,7 @@ void ChatService::registeHandler(EnMsgType msgtype, Obj* obj, void (Obj::*method
 ChatService::ChatService(){
     registeHandler<ChatService>(EnMsgType::MSG_LOGIN, this, &ChatService::login);
     registeHandler<ChatService>(EnMsgType::MSG_REG, this, &ChatService::reg);
+    registeHandler<ChatService>(EnMsgType::MSG_ONE_CHAT, this, &ChatService::onechat);
 }
 
 CbType ChatService::getHandler(MsgUnderType id){
@@ -99,4 +100,40 @@ void ChatService::reg(const muduo::net::TcpConnectionPtr& conn, json& js, muduo:
         response["errno"] = 1;
     }
     conn->send(response.dump());
+}
+
+void ChatService::clientCloseException(const muduo::net::TcpConnectionPtr& conn){
+    User user;    
+
+    {   // 删除用户连接信息
+        std::lock_guard<std::mutex> l(m_conMutex);
+        for(const auto& [key, connection]: m_userConMap){
+            if(connection == conn){
+                m_userConMap.erase(key);
+                user.setId(key);
+                break;
+            }
+        }
+    }
+    // 设置用户为offline
+    user.setState("offline");
+    m_usermodel.updateState(user);
+}
+
+void ChatService::onechat(const muduo::net::TcpConnectionPtr& conn, json& js, muduo::Timestamp tsp){
+    int toId = js["to"].get<int>();
+    bool isOnline = true;
+
+    {
+        std::lock_guard<std::mutex> l(m_conMutex);
+        auto it = m_userConMap.find(toId);
+        isOnline = (it != m_userConMap.end());
+        if(isOnline){
+            // 在线, 服务器直接把消息传给目标用户
+            it->second->send(js.dump());
+            return;
+        }
+    }
+    // 离线，写入离线表中
+
 }

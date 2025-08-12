@@ -33,11 +33,24 @@
 |userid|int|用户id|NOT NULL|
 |message|VARCHAR(500)|离线消息(json)|NOT NULL|
 
+##### json字段
+###### 登录
+{"msgid":2,"id":1,"name":"huangyuming","pwd":"sbhym"}
+{"msgid":3,"erron":0,"id":1,"name":"huangyuming"}
+{"msgid":3,"erron":1,"errinfo":"already online"}
+###### 注册
+{"msgid":0,"name":"huangyuming","pwd":"sbhym"}
+
+###### 聊天
+{"msgid":4,"id":1,"from":"huangyuming","to":2,"msg":"xxx"}
+
 
 ##### 实现细节
 1. 继承形式的单例模式，注意shared_ptr用裸指针reset(否则make_shared无法访问到子类构造函数)，在类中声明友元类等问题
 2. 为了防止sql注入，需要加上预编译sql语句的实现
 3. 服务器将消息推送给用户，需要常连接，需要将已建立连接的用户的连接保存下来。因为多线程服务器不确定用户在哪个线程中被处理，需要对映射关系加锁
+4. 需要处理客户端异常退出的情况，否则根据登录逻辑客户将永远无法再次登录
+5. 在一对一的通信中，小心连接映射表的多线程操作安全
 
 ##### 一些问题
 1. 实现业务处理和网络服务的两种方法，面向接口和面向回调

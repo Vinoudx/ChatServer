@@ -24,7 +24,10 @@ void ChatServer::start(){
 }
 
 void ChatServer::onConnection(const muduo::net::TcpConnectionPtr& conn){
-
+    if(conn->disconnected()){
+        ChatService::instance()->clientCloseException(conn);
+        conn->shutdown();
+    }
 }
 
 void ChatServer::onMessage(const muduo::net::TcpConnectionPtr& conn, muduo::net::Buffer* buf, muduo::Timestamp tsp){

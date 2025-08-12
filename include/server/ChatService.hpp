@@ -28,6 +28,10 @@ public:
 
     void login(const muduo::net::TcpConnectionPtr& conn, json& js, muduo::Timestamp tsp);
     void reg(const muduo::net::TcpConnectionPtr& conn, json& js, muduo::Timestamp tsp);
+    void onechat(const muduo::net::TcpConnectionPtr& conn, json& js, muduo::Timestamp tsp);
+
+    // 处理客户端异常退出
+    void clientCloseException(const muduo::net::TcpConnectionPtr& conn);
 
     ~ChatService() = default;
 private:

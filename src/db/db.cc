@@ -43,4 +43,4 @@ int Mysql::getCurrentId(){
     return mysql_insert_id(m_conn);
 }
 
-//send {"msgid":0,"name":"huangyuming","pwd":"sbhym"}
+//send {"msgid":2,"id":1,"name":"huangyuming","pwd":"sbhym"}
