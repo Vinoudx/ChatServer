@@ -2,6 +2,8 @@
 
 #include <muduo/base/Logging.h>
 
+#include "User.hpp"
+
 template<typename T = void>
 void ChatService::registeHandler(EnMsgType msgtype, auto&& handler){
     m_cbFuncMap.insert_or_assign(getEnumValue(msgtype), 
@@ -47,5 +49,19 @@ void ChatService::login(const muduo::net::TcpConnectionPtr& conn, json& js, mudu
     LOG_INFO << "someone login !";
 }
 void ChatService::reg(const muduo::net::TcpConnectionPtr& conn, json& js, muduo::Timestamp tsp){
-    LOG_INFO << "someone registered !";
+    User user;
+    user.setName(js["name"]);
+    user.setPwd(js["pwd"]);
+
+    bool res = m_usermodel.insert(user);
+    json response;  
+    if (res){
+        response["msgid"] = getEnumValue(EnMsgType::MSG_REG_ACK);
+        response["errno"] = 0;
+        response["userid"] = user.getId();
+    }else{
+        response["msgid"] = getEnumValue(EnMsgType::MSG_REG_ACK);
+        response["errno"] = 1;
+    }
+    conn->send(response.dump());
 }

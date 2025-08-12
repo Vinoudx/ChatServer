@@ -7,7 +7,9 @@
 
 enum class EnMsgType{
     MSG_REG,
+    MSG_REG_ACK, // 表示注册回复
     MSG_LOGIN,
+    MSG_LOGIN_ACK, // 表示登录回复
 };
 
 using MsgUnderType = std::underlying_type_t<EnMsgType>;

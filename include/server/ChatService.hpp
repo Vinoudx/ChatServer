@@ -9,6 +9,7 @@
 using json = nlohmann::json;
 
 #include "public.hpp"
+#include "UserModel.hpp"
 
 using CbType = std::function<void(const muduo::net::TcpConnectionPtr&, json&, muduo::Timestamp)>;
 
@@ -33,6 +34,8 @@ private:
     ChatService();
     
     std::unordered_map<MsgUnderType, CbType> m_cbFuncMap;
+
+    UserModel m_usermodel;
 };
 
 
