@@ -16,7 +16,7 @@ class ChatService : public Singleton<ChatService> {
     friend class Singleton<ChatService>;
 public:
     template<typename Obj>
-    void registeHandler(EnMsgType msgtype, void (*handler)(const muduo::net::TcpConnectionPtr&, json&, muduo::Timestamp));
+    void registeHandler(EnMsgType msgtype, auto&& handler);
 
     template <typename Obj>
     void registeHandler(EnMsgType msgtype, Obj* obj, void (Obj::*method)(const muduo::net::TcpConnectionPtr&, json&, muduo::Timestamp));

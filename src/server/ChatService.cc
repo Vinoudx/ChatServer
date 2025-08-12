@@ -2,10 +2,10 @@
 
 #include <muduo/base/Logging.h>
 
-template<typename>
-void ChatService::registeHandler(EnMsgType msgtype, void (*handler)(const muduo::net::TcpConnectionPtr&, json&, muduo::Timestamp)){
+template<typename T = void>
+void ChatService::registeHandler(EnMsgType msgtype, auto&& handler){
     m_cbFuncMap.insert_or_assign(getEnumValue(msgtype), 
-        [this, handler](auto&& ...args)->void{
+        [handler = std::forward<decltype(handler)>(handler)](auto&& ...args)->void{
             handler(std::forward<decltype(args)>(args)...);
         }
     );
