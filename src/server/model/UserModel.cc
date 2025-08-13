@@ -53,3 +53,15 @@ bool UserModel::updateState(User& user){
     }
     return false;
 }
+
+bool UserModel::resetState(){
+    char sql[] = "UPDATE User SET state='offline' WHERE state='online'";
+
+    Mysql mysql;
+    if(mysql.connect()){
+        if(mysql.update(sql)){
+            return true;
+        }
+    }
+    return false;
+}

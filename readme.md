@@ -44,6 +44,18 @@
 ###### 聊天
 {"msgid":4,"id":1,"from":"huangyuming","to":2,"msg":"xxx"}
 
+###### 加好友
+{"msgid":5,"id":1,"friendid":"2"}
+
+###### 创建组
+{"msgid":6,"id":1,"gname":"name","gdesc":"desc"}
+
+###### 加入组
+{"msgid":7,"id":1,"gid":"2"}
+
+###### 组聊天
+{"msgid":8,"id":1,"gid":"2","msg":"xxx"}
+
 
 ##### 实现细节
 1. 继承形式的单例模式，注意shared_ptr用裸指针reset(否则make_shared无法访问到子类构造函数)，在类中声明友元类等问题

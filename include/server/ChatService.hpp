@@ -11,6 +11,9 @@ using json = nlohmann::json;
 
 #include "public.hpp"
 #include "UserModel.hpp"
+#include "OfflineMsgModel.hpp"
+#include "FriendModel.hpp"
+#include "GroupModel.hpp"
 
 using CbType = std::function<void(const muduo::net::TcpConnectionPtr&, json&, muduo::Timestamp)>;
 
@@ -29,9 +32,15 @@ public:
     void login(const muduo::net::TcpConnectionPtr& conn, json& js, muduo::Timestamp tsp);
     void reg(const muduo::net::TcpConnectionPtr& conn, json& js, muduo::Timestamp tsp);
     void onechat(const muduo::net::TcpConnectionPtr& conn, json& js, muduo::Timestamp tsp);
+    void addfriend(const muduo::net::TcpConnectionPtr& conn, json& js, muduo::Timestamp tsp);
+    void creategroup(const muduo::net::TcpConnectionPtr& conn, json& js, muduo::Timestamp tsp);
+    void joingroup(const muduo::net::TcpConnectionPtr& conn, json& js, muduo::Timestamp tsp);
+    void groupchat(const muduo::net::TcpConnectionPtr& conn, json& js, muduo::Timestamp tsp);
 
     // 处理客户端异常退出
     void clientCloseException(const muduo::net::TcpConnectionPtr& conn);
+    // 处理服务器异常退出
+    void reset();
 
     ~ChatService() = default;
 private:
@@ -44,6 +53,10 @@ private:
     std::unordered_map<int, muduo::net::TcpConnectionPtr> m_userConMap;
 
     UserModel m_usermodel;
+    OfflineMsgModel m_offlinemsgmoodel;
+    FriendModel m_friendmodel;
+    GroupModel m_groupmodel;
+
 };
 
 

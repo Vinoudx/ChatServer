@@ -11,6 +11,10 @@ enum class EnMsgType{
     MSG_LOGIN,
     MSG_LOGIN_ACK, // 表示登录回复
     MSG_ONE_CHAT,  // 一对一聊天消息
+    MSG_ADD_FRIEND, // 添加好友信息
+    MSG_CREATE_GROUP,//创建组
+    MSG_JOIN_GROUP, // 加入组
+    MSG_GROUP_CHAT,  // 组聊天
 };
 
 using MsgUnderType = std::underlying_type_t<EnMsgType>;
