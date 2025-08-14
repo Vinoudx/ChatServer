@@ -25,22 +25,22 @@ bool Mysql::connect(){
 
 bool Mysql::update(const std::string& sql){
     if(mysql_query(m_conn, sql.c_str())){
-        LOG_ERROR<< "update fail";
+        LOG_ERROR<< "update fail " << sql <<' ' << mysql_error(m_conn);
         return false;
     }
+    LOG_INFO<< "update success"; 
     return true;
 }
 
 MYSQL_RES* Mysql::query(const std::string& sql){
     if(mysql_query(m_conn, sql.c_str())){
-        LOG_ERROR<< "update fail";
+        LOG_ERROR<< "query fail " << sql << ' ' << mysql_error(m_conn);
         return nullptr;
     }
+    LOG_INFO<< "query success";
     return mysql_use_result(m_conn);
 }
 
 int Mysql::getCurrentId(){
     return mysql_insert_id(m_conn);
 }
-
-//send {"msgid":2,"id":1,"name":"huangyuming","pwd":"sbhym"}

@@ -36,6 +36,7 @@ public:
     void creategroup(const muduo::net::TcpConnectionPtr& conn, json& js, muduo::Timestamp tsp);
     void joingroup(const muduo::net::TcpConnectionPtr& conn, json& js, muduo::Timestamp tsp);
     void groupchat(const muduo::net::TcpConnectionPtr& conn, json& js, muduo::Timestamp tsp);
+    void logout(const muduo::net::TcpConnectionPtr& conn, json& js, muduo::Timestamp tsp);
 
     // 处理客户端异常退出
     void clientCloseException(const muduo::net::TcpConnectionPtr& conn);

@@ -42,7 +42,7 @@
 {"msgid":0,"name":"huangyuming","pwd":"sbhym"}
 
 ###### 聊天
-{"msgid":4,"id":1,"from":"huangyuming","to":2,"msg":"xxx"}
+{"msgid":4,"id":1,"from":"huangyuming","to":2,"msg":"xxx","time":"xxx"}
 
 ###### 加好友
 {"msgid":5,"id":1,"friendid":"2"}
@@ -54,7 +54,7 @@
 {"msgid":7,"id":1,"gid":"2"}
 
 ###### 组聊天
-{"msgid":8,"id":1,"gid":"2","msg":"xxx"}
+{"msgid":8,"id":1,"gid":"2","msg":"xxx","time":"xxx"}
 
 
 ##### 实现细节

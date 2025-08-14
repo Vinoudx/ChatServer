@@ -4,7 +4,7 @@
 
 bool GroupModel::createGroup(Group& group){
     char sql[1024] = {0};
-    sprintf(sql, "INSERT INTO AllGroup VALUES ('%s', '%s')", group.getName().c_str(), group.getDesc().c_str());
+    sprintf(sql, "INSERT INTO AllGroup(groupname, groupdesc) VALUES ('%s', '%s')", group.getName().c_str(), group.getDesc().c_str());
 
     Mysql mysql;
     if(mysql.connect()){

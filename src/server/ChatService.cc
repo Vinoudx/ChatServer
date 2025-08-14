@@ -35,6 +35,7 @@ ChatService::ChatService(){
     registeHandler<ChatService>(EnMsgType::MSG_CREATE_GROUP, this, &ChatService::creategroup);
     registeHandler<ChatService>(EnMsgType::MSG_JOIN_GROUP, this, &ChatService::joingroup);
     registeHandler<ChatService>(EnMsgType::MSG_GROUP_CHAT, this, &ChatService::groupchat);
+    registeHandler<ChatService>(EnMsgType::MSG_LOGOUT, this, &ChatService::logout);
 }
 
 CbType ChatService::getHandler(MsgUnderType id){
@@ -99,6 +100,29 @@ void ChatService::login(const muduo::net::TcpConnectionPtr& conn, json& js, mudu
                     vec.emplace_back(js.dump());
                 }
                 response["friends"] = vec;
+            }
+            
+            std::vector<Group> groups = m_groupmodel.queryGroups(user.getId());
+            if(!groups.empty()){
+                std::vector<std::string> vec;
+                for(auto& group: groups){
+                    json js;
+                    js["id"] = group.getId();
+                    js["gname"] = group.getName();
+                    js["gdesc"] = group.getDesc();
+                    std::vector<std::string> vec1;
+                    for(auto& user: group.getUsers()){
+                        json js1;
+                        js1["id"] = user.getId();
+                        js1["name"] = user.getName();
+                        js1["state"] = user.getState();
+                        js1["role"] = user.getRole();
+                        vec1.emplace_back(js1.dump());
+                    }
+                    js["users"] = vec1;
+                    vec.emplace_back(js.dump());
+                }
+                response["groups"] = vec;
             }
 
             if(conn->connected()){
@@ -213,10 +237,27 @@ void ChatService::groupchat(const muduo::net::TcpConnectionPtr& conn, json& js, 
     std::lock_guard<std::mutex> l(m_conMutex);
     for(auto& member: members){
         auto it = m_userConMap.find(member);
-        if(it != m_userConMap.end()){
-            it->second->send(js.dump());
-        }else{
-            m_offlinemsgmoodel.insert(member, js.dump());
+            if(it != m_userConMap.end()){
+                it->second->send(js.dump());
+            }else{
+                m_offlinemsgmoodel.insert(member, js.dump());
+            }
+    }
+}
+
+void ChatService::logout(const muduo::net::TcpConnectionPtr& conn, json& js, muduo::Timestamp tsp){
+    int userid = js["id"];
+    User user;
+    user.setId(userid);
+    user.setState("offline");
+    m_usermodel.updateState(user);
+    {   // 删除用户连接信息
+        std::lock_guard<std::mutex> l(m_conMutex);
+        for(const auto& [key, connection]: m_userConMap){
+            if(key == userid){
+                m_userConMap.erase(key);
+                break;
+            }
         }
     }
 }

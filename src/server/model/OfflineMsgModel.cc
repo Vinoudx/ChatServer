@@ -18,7 +18,7 @@ bool OfflineMsgModel::insert(int userid, const std::string& msg){
 
 bool OfflineMsgModel::remove(int userid){
     char sql[1024] = {0};
-    sprintf(sql, "delete from OfflineMessage where id=%d", 
+    sprintf(sql, "delete from OfflineMessage where userid=%d", 
         userid);
 
     Mysql mysql;
@@ -32,7 +32,7 @@ bool OfflineMsgModel::remove(int userid){
 
 std::vector<std::string> OfflineMsgModel::query(int userid){
     char sql[1024] = {0};
-    sprintf(sql, "SELECT message FROM OfflineMessage WHERE id=%d", userid);
+    sprintf(sql, "SELECT message FROM OfflineMessage WHERE userid=%d", userid);
 
     Mysql mysql; 
     std::vector<std::string> vec;

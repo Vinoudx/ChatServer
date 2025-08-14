@@ -15,6 +15,7 @@ enum class EnMsgType{
     MSG_CREATE_GROUP,//创建组
     MSG_JOIN_GROUP, // 加入组
     MSG_GROUP_CHAT,  // 组聊天
+    MSG_LOGOUT, //注销
 };
 
 using MsgUnderType = std::underlying_type_t<EnMsgType>;
