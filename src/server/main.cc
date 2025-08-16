@@ -13,12 +13,17 @@ void sigint_handler(int){
     exit(0);
 }
 
-int main(){
+int main(int args, char** argv){
 
     signal(SIGINT, sigint_handler);
 
+    if(args < 3){
+        std::cout<< "not enough params\n";
+        return -1;
+    }
+
     muduo::net::EventLoop eventloop;
-    muduo::net::InetAddress addr("127.0.0.1", 6666);
+    muduo::net::InetAddress addr(argv[1], atoi(argv[2]));
     ChatServer s(&eventloop, addr, "chat");
 
     s.start();

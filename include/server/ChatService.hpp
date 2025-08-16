@@ -14,6 +14,7 @@ using json = nlohmann::json;
 #include "OfflineMsgModel.hpp"
 #include "FriendModel.hpp"
 #include "GroupModel.hpp"
+#include "redis.hpp"
 
 using CbType = std::function<void(const muduo::net::TcpConnectionPtr&, json&, muduo::Timestamp)>;
 
@@ -38,6 +39,8 @@ public:
     void groupchat(const muduo::net::TcpConnectionPtr& conn, json& js, muduo::Timestamp tsp);
     void logout(const muduo::net::TcpConnectionPtr& conn, json& js, muduo::Timestamp tsp);
 
+    void redisMessageHandler(int channel, const std::string& message);
+
     // 处理客户端异常退出
     void clientCloseException(const muduo::net::TcpConnectionPtr& conn);
     // 处理服务器异常退出
@@ -57,6 +60,8 @@ private:
     OfflineMsgModel m_offlinemsgmoodel;
     FriendModel m_friendmodel;
     GroupModel m_groupmodel;
+
+    Redis m_redis;
 
 };
 

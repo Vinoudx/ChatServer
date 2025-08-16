@@ -36,6 +36,12 @@ ChatService::ChatService(){
     registeHandler<ChatService>(EnMsgType::MSG_JOIN_GROUP, this, &ChatService::joingroup);
     registeHandler<ChatService>(EnMsgType::MSG_GROUP_CHAT, this, &ChatService::groupchat);
     registeHandler<ChatService>(EnMsgType::MSG_LOGOUT, this, &ChatService::logout);
+
+    if(m_redis.connect()){
+        m_redis.setCb([this](int channel, const std::string& message){
+            this->redisMessageHandler(channel, message);
+        });
+    }
 }
 
 CbType ChatService::getHandler(MsgUnderType id){
@@ -124,11 +130,15 @@ void ChatService::login(const muduo::net::TcpConnectionPtr& conn, json& js, mudu
                 }
                 response["groups"] = vec;
             }
-
+                
             if(conn->connected()){
                 m_usermodel.updateState(user);  
                 conn->send(response.dump());
+                // 订阅redis
+                m_redis.subscribe(user.getId());   
             }
+
+
         }
 
     }else{
@@ -171,6 +181,8 @@ void ChatService::clientCloseException(const muduo::net::TcpConnectionPtr& conn)
             }
         }
     }
+
+    m_redis.unsubscribe(user.getId());
     // 设置用户为offline
     user.setState("offline");
     m_usermodel.updateState(user);
@@ -179,24 +191,37 @@ void ChatService::clientCloseException(const muduo::net::TcpConnectionPtr& conn)
 void ChatService::onechat(const muduo::net::TcpConnectionPtr& conn, json& js, muduo::Timestamp tsp){
     int toId = js["to"].get<int>();
     bool isOnline = true;
-
     {
         std::lock_guard<std::mutex> l(m_conMutex);
         auto it = m_userConMap.find(toId);
-        isOnline = (it != m_userConMap.end());
-        if(isOnline && it->second->connected()){ // 这里需要保存离线信息所以还是要判断一下连接是否还在
+        if((it != m_userConMap.end()) && it->second->connected()){ // 这里需要保存离线信息所以还是要判断一下连接是否还在
             // 在线, 服务器直接把消息传给目标用户
             it->second->send(js.dump());
             return;
         }
     }
-    // 离线，写入离线表中
-    m_offlinemsgmoodel.insert(toId, js.dump());
+
+    User user = m_usermodel.query(toId);
+    if(user.getState() == "online"){
+        // 在另一台服务器上在线
+        m_redis.publish(toId, js.dump());
+    }else{
+        // 离线，写入离线表中
+        m_offlinemsgmoodel.insert(toId, js.dump());
+    }
 }
 
 void ChatService::reset(){
     // 将所有online状态的用户重置为offline
-    m_usermodel.resetState();
+    // m_usermodel.resetState();
+    std::lock_guard<std::mutex> l(m_conMutex);
+    for(const auto& items: m_userConMap){
+        User user;
+        user.setId(items.first);
+        user.setState("offline");
+        m_usermodel.updateState(user);
+        items.second->shutdown();
+    }
 }
 
 void ChatService::addfriend(const muduo::net::TcpConnectionPtr& conn, json& js, muduo::Timestamp tsp){
@@ -240,7 +265,14 @@ void ChatService::groupchat(const muduo::net::TcpConnectionPtr& conn, json& js, 
             if(it != m_userConMap.end()){
                 it->second->send(js.dump());
             }else{
-                m_offlinemsgmoodel.insert(member, js.dump());
+                User user = m_usermodel.query(member);
+                if(user.getState() == "online"){
+                    // 在另一台服务器上在线
+                    m_redis.publish(member, js.dump());
+                }else{
+                    // 离线，写入离线表中
+                    m_offlinemsgmoodel.insert(member, js.dump());
+                }
             }
     }
 }
@@ -260,4 +292,18 @@ void ChatService::logout(const muduo::net::TcpConnectionPtr& conn, json& js, mud
             }
         }
     }
+    m_redis.unsubscribe(user.getId());
+}
+
+void ChatService::redisMessageHandler(int channel, const std::string& message){
+    {
+        std::lock_guard<std::mutex> l(m_conMutex);
+        auto it = m_userConMap.find(channel);
+        if(it != m_userConMap.end()){
+            it->second->send(message);
+            return;
+        }
+    }
+    // 可能在消息上报的时候用户下线了
+    m_offlinemsgmoodel.insert(channel, message);
 }
