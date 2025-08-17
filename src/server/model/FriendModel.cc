@@ -1,38 +1,40 @@
 #include "FriendModel.hpp"
 
-#include "db.hpp"
+#include "ConnectionPool.hpp"
 
 bool FriendModel::insert(int userid, int friendid){
     char sql[1024] = {0};
     sprintf(sql, "INSERT INTO Friend VALUES (%d, %d)", userid, friendid);
 
-    Mysql mysql;
-    if(mysql.connect()){
-        if(mysql.update(sql)){
-            return true;
-        }
+    int id = ConnectionPool::instance()->update(sql);
+    if(id == -1){
+        LOG_ERROR<< "update fail " << sql;
+        return false;
+    }else{
+        LOG_INFO<< "update success " << sql;
+        return true;
     }
-    return false;
 }
 
 std::vector<User> FriendModel::query(int userid){
     char sql[1024] = {0};
-    sprintf(sql, "SELECT id, name, state FROM User, Friend WHERE friendid=id and userid=%d", userid);
+    sprintf(sql, "select id, name, state from User, Friend where (friendid =id and userid = %d) or (userid = id and friendid= %d)", 
+            userid, userid);
 
-    Mysql mysql;
-    std::vector<User> vec;    
-    if(mysql.connect()){
-        MYSQL_RES* res = mysql.query(sql);
-        if(res != nullptr){
-            MYSQL_ROW row;
-            while((row = mysql_fetch_row(res)) != nullptr){
-                User u;
-                u.setId(atoi(row[0]));
-                u.setName(row[1]);
-                u.setState(row[2]);
-                vec.emplace_back(std::move(u));
-            }
+    std::vector<User> vec;
+    MysqlRes res = ConnectionPool::instance()->query(sql);
+    if(res.isValid){
+        LOG_INFO<< "query success "<< sql;
+        MYSQL_ROW row;
+        while((row = mysql_fetch_row(res.res)) != nullptr){
+            User u;
+            u.setId(atoi(row[0]));
+            u.setName(row[1]);
+            u.setState(row[2]);
+            vec.emplace_back(std::move(u));
         }
+    }else{
+        LOG_ERROR<< "query fail "<<sql;
     }
     return vec;
 }

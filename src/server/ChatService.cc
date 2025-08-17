@@ -65,7 +65,6 @@ void ChatService::login(const muduo::net::TcpConnectionPtr& conn, json& js, mudu
     int id = js["id"];
     std::string password = js["pwd"];
     User user = m_usermodel.query(id);
-
     json response;
     if(user.getId() == id && user.getPwd() == password){
 

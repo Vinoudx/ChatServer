@@ -1,34 +1,34 @@
-#ifndef _DB_
-#define _DB_
+// #ifndef _DB_
+// #define _DB_
 
-#include <string>
+// #include <string>
 
-#include <mysql/mysql.h>
-#include <muduo/base/Logging.h>
+// #include <mysql/mysql.h>
+// #include <muduo/base/Logging.h>
 
-static std::string server = "127.0.0.1";
-static std::string user = "root";
-static std::string password = "Fjh57593980";
-static std::string dbname = "chat";
+// static std::string server = "127.0.0.1";
+// static std::string user = "root";
+// static std::string password = "Fjh57593980";
+// static std::string dbname = "chat";
 
-class Mysql{
-public:
-    Mysql();
+// class Mysql{
+// public:
+//     Mysql();
 
-    ~Mysql();
+//     ~Mysql();
 
-    bool connect();
+//     bool connect();
 
-    bool update(const std::string& sql);
+//     bool update(const std::string& sql);
 
-    MYSQL_RES* query(const std::string& sql);
+//     MYSQL_RES* query(const std::string& sql);
 
-    int getCurrentId();
+//     int getCurrentId();
 
-private:
-    MYSQL* m_conn;
-};
+// private:
+//     MYSQL* m_conn;
+// };
 
 
 
-#endif
+// #endif

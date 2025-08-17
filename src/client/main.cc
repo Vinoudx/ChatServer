@@ -301,7 +301,7 @@ void readTaskHandler(int clientfd)
         int msgtype = js["msgid"].get<int>();
         if (getEnumValue(EnMsgType::MSG_ONE_CHAT) == msgtype)
         {
-            cout << js["time"].get<string>() << " [" << js["id"] << "]" << js["name"].get<string>()
+            cout << "好友:" << js["time"].get<string>() << " [" << js["id"] << "]" << js["name"].get<string>()
                  << " said: " << js["msg"].get<string>() << endl;
             continue;
         }
