@@ -17,10 +17,20 @@ using json = nlohmann::json;
 #include <arpa/inet.h>
 #include <semaphore.h>
 #include <atomic>
+#include <queue>
 
 #include "Group.hpp"
 #include "User.hpp"
 #include "public.hpp"
+
+auto cmp = [](const json& lhs, const json& rhs){return lhs["seq"].get<size_t>() > rhs["seq"].get<size_t>();};
+
+struct OnlineFriendsInfo{
+    OnlineFriendsInfo(User&& u):user(std::move(u)),seq(0),buffer(cmp){}
+    User user;
+    size_t seq;
+    priority_queue<json, vector<json>, decltype(cmp)> buffer;
+};
 
 // 记录当前系统登录的用户信息
 User g_currentUser;
@@ -28,6 +38,8 @@ User g_currentUser;
 vector<User> g_currentUserFriendList;
 // 记录当前登录用户的群组列表信息
 vector<Group> g_currentUserGroupList;
+// 记录当前在线的好友的信息
+unordered_map<int, OnlineFriendsInfo> g_currentOnlineFriends;
 
 // 控制主菜单页面程序
 bool isMainMenuRunning = false;
@@ -46,6 +58,14 @@ string getCurrentTime();
 void mainMenu(int);
 // 显示当前登录成功用户的基本信息
 void showCurrentUserData();
+// 显示好友
+void showFriends();
+// 显示群组
+void showGroups();
+// 加上在线好友
+void addOnlineFriends(const json& js);
+// 移除在线好友
+void removeOnlineFriends(const json& js);
 
 // 聊天客户端程序实现，main线程用作发送线程，子线程用作接收线程
 int main(int argc, char **argv)
@@ -178,6 +198,62 @@ int main(int argc, char **argv)
     return 0;
 }
 
+void updateFriends(const json& responsejs){
+    bool isFirst = g_currentOnlineFriends.empty();
+    g_currentUserFriendList.clear();
+    // 记录当前用户的好友列表信息
+    if (responsejs.contains("friends")){
+        // 初始化
+        g_currentUserFriendList.clear();
+        vector<string> vec = responsejs["friends"];
+        for (string &str : vec){
+            json js = json::parse(str);
+            User user;
+            user.setId(js["id"].get<int>());
+            user.setName(js["name"]);
+            user.setState(js["state"]);
+            g_currentUserFriendList.push_back(user);
+            if(isFirst && js["state"] == "online"){
+                g_currentOnlineFriends.insert_or_assign(user.getId(), std::move(user));
+            }
+        }
+    }
+}
+
+void updateGroup(const json& responsejs){
+    g_currentUserGroupList.clear();
+    // 记录当前用户的群组列表信息
+    if (responsejs.contains("groups"))
+    {
+        // 初始化
+        g_currentUserGroupList.clear();
+
+        vector<string> vec1 = responsejs["groups"];
+        for (string &groupstr : vec1)
+        {
+            json grpjs = json::parse(groupstr);
+            Group group;
+            group.setId(grpjs["id"].get<int>());
+            group.setName(grpjs["gname"]);
+            group.setDesc(grpjs["gdesc"]);
+
+            vector<string> vec2 = grpjs["users"];
+            for (string &userstr : vec2)
+            {
+                GroupUser user;
+                json js = json::parse(userstr);
+                user.setId(js["id"].get<int>());
+                user.setName(js["name"]);
+                user.setState(js["state"]);
+                user.setRole(js["role"]);
+                group.getUsers().push_back(user);
+            }
+
+            g_currentUserGroupList.push_back(group);
+        }
+    } 
+}
+
 // 处理注册的响应逻辑
 void doRegResponse(json &responsejs)
 {
@@ -207,53 +283,10 @@ void doLoginResponse(json &responsejs)
         g_currentUser.setName(responsejs["name"]);
 
         // 记录当前用户的好友列表信息
-        if (responsejs.contains("friends"))
-        {
-            // 初始化
-            g_currentUserFriendList.clear();
-
-            vector<string> vec = responsejs["friends"];
-            for (string &str : vec)
-            {
-                json js = json::parse(str);
-                User user;
-                user.setId(js["id"].get<int>());
-                user.setName(js["name"]);
-                user.setState(js["state"]);
-                g_currentUserFriendList.push_back(user);
-            }
-        }
+        updateFriends(responsejs);
 
         // 记录当前用户的群组列表信息
-        if (responsejs.contains("groups"))
-        {
-            // 初始化
-            g_currentUserGroupList.clear();
-
-            vector<string> vec1 = responsejs["groups"];
-            for (string &groupstr : vec1)
-            {
-                json grpjs = json::parse(groupstr);
-                Group group;
-                group.setId(grpjs["id"].get<int>());
-                group.setName(grpjs["gname"]);
-                group.setDesc(grpjs["gdesc"]);
-
-                vector<string> vec2 = grpjs["users"];
-                for (string &userstr : vec2)
-                {
-                    GroupUser user;
-                    json js = json::parse(userstr);
-                    user.setId(js["id"].get<int>());
-                    user.setName(js["name"]);
-                    user.setState(js["state"]);
-                    user.setRole(js["role"]);
-                    group.getUsers().push_back(user);
-                }
-
-                g_currentUserGroupList.push_back(group);
-            }
-        }
+        updateGroup(responsejs);
 
         // 显示登录用户的基本信息
         showCurrentUserData();
@@ -261,6 +294,7 @@ void doLoginResponse(json &responsejs)
         // 显示当前用户的离线消息  个人聊天信息或者群组消息
         if (responsejs.contains("offlinemsg"))
         {
+            cout << "===============offline message====================" <<endl;
             vector<string> vec = responsejs["offlinemsg"];
             for (string &str : vec)
             {
@@ -277,6 +311,7 @@ void doLoginResponse(json &responsejs)
                             << " said: " << js["msg"].get<string>() << endl;
                 }
             }
+            cout << "==================================================" <<endl;
         }
 
         g_isLoginSuccess = true;
@@ -301,8 +336,30 @@ void readTaskHandler(int clientfd)
         int msgtype = js["msgid"].get<int>();
         if (getEnumValue(EnMsgType::MSG_ONE_CHAT) == msgtype)
         {
-            cout << "好友:" << js["time"].get<string>() << " [" << js["id"] << "]" << js["name"].get<string>()
-                 << " said: " << js["msg"].get<string>() << endl;
+            // 首先判断是不是乱序到达
+            auto showMessage = [](const json& js){cout << "好友:" << js["time"].get<string>() << " [" << js["id"] << "]" << js["name"].get<string>()
+                 << " said: " << js["msg"].get<string>() << endl;};
+            
+            auto it = g_currentOnlineFriends.find(js["id"].get<int>());
+            if(it != g_currentOnlineFriends.end()){
+                // 对方在线
+                if(js["seq"].get<int>() == it->second.seq){
+                    // 按序到达
+                    it->second.seq++;
+                    showMessage(js);
+                    // 将后续内容发出
+                    while(!it->second.buffer.empty() && it->second.buffer.top()["seq"].get<int>() == it->second.seq){
+                        showMessage(it->second.buffer.top());
+                        it->second.seq++;
+                    }
+                }else{
+                    // 乱序到达
+                    it->second.buffer.push(js);
+                }
+            }else{
+                // 非常小概率对方不在线
+                showMessage(js);
+            }
             continue;
         }
 
@@ -326,14 +383,51 @@ void readTaskHandler(int clientfd)
             sem_post(&rwsem);    // 通知主线程，注册结果处理完成
             continue;
         }
+
+        if (getEnumValue(EnMsgType::MSG_GET_FRIENDS_REP) == msgtype){
+            updateFriends(js);
+            showFriends();
+            continue;
+        }
+
+        if (getEnumValue(EnMsgType::MSG_GET_GROUP_REP) == msgtype){
+            updateGroup(js);
+            showGroups();
+            continue;
+        }
+
+        if (getEnumValue(EnMsgType::MSG_ONLINE_NOTIFY) == msgtype){
+            addOnlineFriends(js);
+            continue;
+        }
+
+        if (getEnumValue(EnMsgType::MSG_OFFLINE_NOTIFY) == msgtype){
+            removeOnlineFriends(js);
+            continue;
+        }
     }
 }
 
-// 显示当前登录成功用户的基本信息
-void showCurrentUserData()
-{
+void removeOnlineFriends(const json& js){
+    int id = js["id"].get<int>();
+    auto it = g_currentOnlineFriends.find(id);
+    if(it != g_currentOnlineFriends.end()){
+        g_currentOnlineFriends.erase(it);
+    }
+}
+
+void addOnlineFriends(const json& js){
+    User user;
+    user.setId(js["id"].get<int>());
+    g_currentOnlineFriends.insert_or_assign(user.getId(), std::move(user));
+}
+
+void showLoginUser(){
     cout << "======================login user======================" << endl;
     cout << "current login user => id:" << g_currentUser.getId() << " name:" << g_currentUser.getName() << endl;
+}
+
+void showFriends(){
     cout << "----------------------friend list---------------------" << endl;
     if (!g_currentUserFriendList.empty())
     {
@@ -342,6 +436,10 @@ void showCurrentUserData()
             cout << user.getId() << " " << user.getName() << " " << user.getState() << endl;
         }
     }
+    cout << "------------------------------------------------------" << endl;
+}
+
+void showGroups(){
     cout << "----------------------group list----------------------" << endl;
     if (!g_currentUserGroupList.empty())
     {
@@ -355,6 +453,15 @@ void showCurrentUserData()
             }
         }
     }
+    cout << "------------------------------------------------------" << endl;
+}
+
+// 显示当前登录成功用户的基本信息
+void showCurrentUserData()
+{
+    showLoginUser();
+    showFriends();
+    showGroups();
     cout << "======================================================" << endl;
 }
 
@@ -372,6 +479,10 @@ void addgroup(int, string);
 void groupchat(int, string);
 // "loginout" command handler
 void loginout(int, string);
+// "friends" command handler
+void getfriends(int, string);
+// "groups" command handler
+void getgroup(int, string);
 
 // 系统支持的客户端命令列表
 unordered_map<string, string> commandMap = {
@@ -381,6 +492,8 @@ unordered_map<string, string> commandMap = {
     {"creategroup", "创建群组，格式creategroup:groupname:groupdesc"},
     {"addgroup", "加入群组，格式addgroup:groupid"},
     {"groupchat", "群聊，格式groupchat:groupid:message"},
+    {"friends", "获得所有好友信息，格式friends"},
+    {"groups", "获得所有群组信息， 格式groups"},
     {"loginout", "注销，格式loginout"}};
 
 // 注册系统支持的客户端命令处理
@@ -391,7 +504,10 @@ unordered_map<string, function<void(int, string)>> commandHandlerMap = {
     {"creategroup", creategroup},
     {"addgroup", addgroup},
     {"groupchat", groupchat},
-    {"loginout", loginout}};
+    {"friends", getfriends},
+    {"groups", getgroup},
+    {"loginout", loginout},
+};
 
 // 主聊天页面程序
 void mainMenu(int clientfd)
@@ -464,6 +580,13 @@ void chat(int clientfd, string str)
     int friendid = atoi(str.substr(0, idx).c_str());
     string message = str.substr(idx + 1, str.size() - idx);
 
+    // 找到friend在线情况
+    auto it = g_currentOnlineFriends.find(friendid);
+    int seq = -1;
+    if(it != g_currentOnlineFriends.end()){
+        seq = it->second.seq;
+    }
+
     json js;
     js["msgid"] = getEnumValue(EnMsgType::MSG_ONE_CHAT);
     js["id"] = g_currentUser.getId();
@@ -471,12 +594,15 @@ void chat(int clientfd, string str)
     js["to"] = friendid;
     js["msg"] = message;
     js["time"] = getCurrentTime();
+    js["seq"] = seq;
     string buffer = js.dump();
 
     int len = send(clientfd, buffer.c_str(), strlen(buffer.c_str()) + 1, 0);
     if (-1 == len)
     {
         cerr << "send chat msg error -> " << buffer << endl;
+    }else{
+        it->second.seq++;
     }
 }
 // "creategroup" command handler  groupname:groupdesc
@@ -568,6 +694,34 @@ void loginout(int clientfd, string)
     }   
 }
 
+void getfriends(int clientfd, string)
+{
+    json js;
+    js["msgid"] = getEnumValue(EnMsgType::MSG_GET_FRIENDS);
+    js["id"] = g_currentUser.getId();
+    string buffer = js.dump();
+
+    int len = send(clientfd, buffer.c_str(), strlen(buffer.c_str()) + 1, 0);
+    if (-1 == len)
+    {
+        cerr << "send addfriend msg error -> " << buffer << endl;
+    }
+}
+
+void getgroup(int clientfd, string)
+{
+    json js;
+    js["msgid"] = getEnumValue(EnMsgType::MSG_GET_GROUP);
+    js["id"] = g_currentUser.getId();
+    string buffer = js.dump();
+
+    int len = send(clientfd, buffer.c_str(), strlen(buffer.c_str()) + 1, 0);
+    if (-1 == len)
+    {
+        cerr << "send addfriend msg error -> " << buffer << endl;
+    }
+}
+
 // 获取系统时间（聊天信息需要添加时间信息）
 string getCurrentTime()
 {
@@ -579,4 +733,5 @@ string getCurrentTime()
             (int)ptm->tm_hour, (int)ptm->tm_min, (int)ptm->tm_sec);
     return std::string(date);
 }
+
 

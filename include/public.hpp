@@ -16,6 +16,12 @@ enum class EnMsgType{
     MSG_JOIN_GROUP, // 加入组
     MSG_GROUP_CHAT,  // 组聊天
     MSG_LOGOUT, //注销
+    MSG_GET_FRIENDS, // 拉取所有好友状态
+    MSG_GET_FRIENDS_REP, // 拉取好友的返回信息
+    MSG_GET_GROUP, // 拉取所有群组
+    MSG_GET_GROUP_REP, // 拉取群组的返回信息
+    MSG_ONLINE_NOTIFY, // 服务器给客户端的上线通知
+    MSG_OFFLINE_NOTIFY, //服务器给客户端的下线通知
 };
 
 using MsgUnderType = std::underlying_type_t<EnMsgType>;

@@ -38,6 +38,12 @@ public:
     void joingroup(const muduo::net::TcpConnectionPtr& conn, json& js, muduo::Timestamp tsp);
     void groupchat(const muduo::net::TcpConnectionPtr& conn, json& js, muduo::Timestamp tsp);
     void logout(const muduo::net::TcpConnectionPtr& conn, json& js, muduo::Timestamp tsp);
+    void getfriends(const muduo::net::TcpConnectionPtr& conn, json& js, muduo::Timestamp tsp);
+    void getgroups(const muduo::net::TcpConnectionPtr& conn, json& js, muduo::Timestamp tsp);
+
+    void getfriendshandler(json& js, int userid);
+    void getgroupshandler(json& js, int userid);
+    void sendToOnlineFriends(int userid, EnMsgType msgtype);
 
     void redisMessageHandler(int channel, const std::string& message);
 

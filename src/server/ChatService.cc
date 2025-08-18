@@ -36,6 +36,8 @@ ChatService::ChatService(){
     registeHandler<ChatService>(EnMsgType::MSG_JOIN_GROUP, this, &ChatService::joingroup);
     registeHandler<ChatService>(EnMsgType::MSG_GROUP_CHAT, this, &ChatService::groupchat);
     registeHandler<ChatService>(EnMsgType::MSG_LOGOUT, this, &ChatService::logout);
+    registeHandler<ChatService>(EnMsgType::MSG_GET_FRIENDS, this, &ChatService::getfriends);
+    registeHandler<ChatService>(EnMsgType::MSG_GET_GROUP, this, &ChatService::getgroups);
 
     if(m_redis.connect()){
         m_redis.setCb([this](int channel, const std::string& message){
@@ -60,6 +62,66 @@ CbType ChatService::getHandler(EnMsgType msgtype){
     return getHandler(getEnumValue(msgtype));
 }
 
+void ChatService::getfriendshandler(json& js, int userid){
+    // 查询好友信息
+    std::vector<User> friends = m_friendmodel.query(userid);
+    if(!friends.empty()){
+        std::vector<std::string> vec;
+        for(auto& user: friends){
+            json js;
+            js["id"] = user.getId();
+            js["name"] = user.getName();
+            js["state"] = user.getState();
+            vec.emplace_back(js.dump());
+        }
+        js["friends"] = vec;
+    }
+}
+
+void ChatService::getgroupshandler(json& js, int userid){
+    // 查询群组信息
+    std::vector<Group> groups = m_groupmodel.queryGroups(userid);
+    if(!groups.empty()){
+        std::vector<std::string> vec;
+        for(auto& group: groups){
+            json js;
+            js["id"] = group.getId();
+            js["gname"] = group.getName();
+            js["gdesc"] = group.getDesc();
+            std::vector<std::string> vec1;
+            for(auto& user: group.getUsers()){
+                json js1;
+                js1["id"] = user.getId();
+                js1["name"] = user.getName();
+                js1["state"] = user.getState();
+                js1["role"] = user.getRole();
+                vec1.emplace_back(js1.dump());
+            }
+            js["users"] = vec1;
+            vec.emplace_back(js.dump());
+        }
+        js["groups"] = vec;
+    }
+}
+
+void ChatService::sendToOnlineFriends(int userid, EnMsgType msgtype){
+    std::vector<User> friends = m_friendmodel.query(userid);
+    json online_notify;
+    online_notify["msgid"] = getEnumValue(msgtype);
+    online_notify["id"] = userid;
+    for(auto& userf: friends){
+        int id = userf.getId();
+        auto it = m_userConMap.find(id);
+        if(it != m_userConMap.end()){
+            it->second->send(online_notify.dump());
+        }else{
+            User user = m_usermodel.query(userf.getId());
+            if(user.getState() == "online"){
+                m_redis.publish(userf.getId(), online_notify.dump());
+            }
+        }
+    }
+}
 
 void ChatService::login(const muduo::net::TcpConnectionPtr& conn, json& js, muduo::Timestamp tsp){
     int id = js["id"];
@@ -67,7 +129,6 @@ void ChatService::login(const muduo::net::TcpConnectionPtr& conn, json& js, mudu
     User user = m_usermodel.query(id);
     json response;
     if(user.getId() == id && user.getPwd() == password){
-
         if(user.getState() == "online"){
             response["msgid"] = getEnumValue(EnMsgType::MSG_LOGIN_ACK);
             response["errno"] = 1;
@@ -75,12 +136,10 @@ void ChatService::login(const muduo::net::TcpConnectionPtr& conn, json& js, mudu
             conn->send(response.dump());
         }else{
             user.setState("online");
-
             {
                 std::lock_guard<std::mutex> l(m_conMutex);
                 m_userConMap.insert_or_assign(user.getId(), conn);
             }
-
             response["msgid"] = getEnumValue(EnMsgType::MSG_LOGIN_ACK);
             response["errno"] = 0;
             response["id"] = user.getId();
@@ -94,52 +153,22 @@ void ChatService::login(const muduo::net::TcpConnectionPtr& conn, json& js, mudu
             }
 
             // 查询好友信息
-            std::vector<User> friends = m_friendmodel.query(user.getId());
-            if(!friends.empty()){
-                std::vector<std::string> vec;
-                for(auto& user: friends){
-                    json js;
-                    js["id"] = user.getId();
-                    js["name"] = user.getName();
-                    js["state"] = user.getState();
-                    vec.emplace_back(js.dump());
-                }
-                response["friends"] = vec;
-            }
+            getfriendshandler(response, user.getId());
             
-            std::vector<Group> groups = m_groupmodel.queryGroups(user.getId());
-            if(!groups.empty()){
-                std::vector<std::string> vec;
-                for(auto& group: groups){
-                    json js;
-                    js["id"] = group.getId();
-                    js["gname"] = group.getName();
-                    js["gdesc"] = group.getDesc();
-                    std::vector<std::string> vec1;
-                    for(auto& user: group.getUsers()){
-                        json js1;
-                        js1["id"] = user.getId();
-                        js1["name"] = user.getName();
-                        js1["state"] = user.getState();
-                        js1["role"] = user.getRole();
-                        vec1.emplace_back(js1.dump());
-                    }
-                    js["users"] = vec1;
-                    vec.emplace_back(js.dump());
-                }
-                response["groups"] = vec;
-            }
+            // 查询群组信息
+            getgroupshandler(response, user.getId());
                 
             if(conn->connected()){
-                m_usermodel.updateState(user);  
-                conn->send(response.dump());
+                m_usermodel.updateState(user);
                 // 订阅redis
-                m_redis.subscribe(user.getId());   
+                m_redis.subscribe(user.getId()); 
+                conn->send(response.dump());
             }
 
+            // 向所有在线好友发在线通知
+            sendToOnlineFriends(user.getId(), EnMsgType::MSG_ONLINE_NOTIFY);
 
         }
-
     }else{
         response["msgid"] = getEnumValue(EnMsgType::MSG_LOGIN_ACK);
         response["errno"] = 1;
@@ -185,6 +214,8 @@ void ChatService::clientCloseException(const muduo::net::TcpConnectionPtr& conn)
     // 设置用户为offline
     user.setState("offline");
     m_usermodel.updateState(user);
+    // 向所有好友发送下线通知
+    sendToOnlineFriends(user.getId(), EnMsgType::MSG_OFFLINE_NOTIFY);
 }
 
 void ChatService::onechat(const muduo::net::TcpConnectionPtr& conn, json& js, muduo::Timestamp tsp){
@@ -292,6 +323,8 @@ void ChatService::logout(const muduo::net::TcpConnectionPtr& conn, json& js, mud
         }
     }
     m_redis.unsubscribe(user.getId());
+    // 向所有好友发送下线通知
+    sendToOnlineFriends(user.getId(), EnMsgType::MSG_OFFLINE_NOTIFY);
 }
 
 void ChatService::redisMessageHandler(int channel, const std::string& message){
@@ -305,4 +338,20 @@ void ChatService::redisMessageHandler(int channel, const std::string& message){
     }
     // 可能在消息上报的时候用户下线了
     m_offlinemsgmoodel.insert(channel, message);
+}
+
+void ChatService::getfriends(const muduo::net::TcpConnectionPtr& conn, json& js, muduo::Timestamp tsp){
+    int id = js["id"].get<int>();
+    json response;
+    response["msgid"] = getEnumValue(EnMsgType::MSG_GET_FRIENDS_REP);
+    getfriendshandler(response, id);
+    conn->send(response.dump());
+}
+
+void ChatService::getgroups(const muduo::net::TcpConnectionPtr& conn, json& js, muduo::Timestamp tsp){
+    int id = js["id"].get<int>();
+    json response;
+    response["msgid"] = getEnumValue(EnMsgType::MSG_GET_GROUP_REP);
+    getgroupshandler(response, id);
+    conn->send(response.dump());
 }
